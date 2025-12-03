@@ -1,0 +1,58 @@
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import multer from "multer";
+
+import authRoutes from "./modules/auth/auth.routes";
+import artifactRoutes from "./modules/artifacts/artifact.routes";
+import categoryRoutes from "./modules/categories/category.routes";
+import aiRoutes from "./modules/ai/ai.routes";
+import userRoutes from "./modules/user/user.routes";
+import roleRoutes from "./modules/roles/role.routes";
+
+const app = express();
+
+app.use(helmet());
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+app.use(
+  (
+    err: any,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error("Global error handler:", err);
+    if (err instanceof multer.MulterError)
+      return res.status(400).json({ message: err.message, code: err.code });
+    if (err && err.message)
+      return res.status(400).json({ message: err.message });
+    return res.status(500).json({ message: "Internal server error" });
+  }
+);
+
+app.use("/api/auth", authLimiter);
+
+// 👇 mount routes SAU khi đã dùng cors + json + helmet
+app.use("/api/auth", authRoutes);
+app.use("/api/artifacts", artifactRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/ai", aiRoutes);
+
+export default app;
