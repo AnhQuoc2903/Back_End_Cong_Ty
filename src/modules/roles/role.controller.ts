@@ -40,3 +40,27 @@ export async function getPermissions(req: Request, res: Response) {
   const perms = await Permission.find().lean();
   res.json(perms);
 }
+
+export async function searchRoles(req: Request, res: Response) {
+  const q = (req.query.q as string) || "";
+  const limit = Math.min(100, Number(req.query.limit) || 50);
+  const page = Math.max(1, Number(req.query.page) || 1);
+
+  const filter = q
+    ? {
+        $or: [{ name: { $regex: q, $options: "i" } }],
+      }
+    : {};
+
+  const [items, total] = await Promise.all([
+    Role.find(filter)
+      .select("name description permissions")
+      .populate("permissions", "name")
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    Role.countDocuments(filter),
+  ]);
+
+  res.json({ data: items, total });
+}

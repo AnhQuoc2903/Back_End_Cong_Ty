@@ -7,6 +7,7 @@ import {
   updateRole,
   deleteRole,
   getPermissions,
+  searchRoles,
 } from "./role.controller";
 
 const router = Router();
@@ -23,5 +24,6 @@ router.get(
   requirePermission("ADMIN_PANEL"),
   getPermissions
 );
+router.get("/search", searchRoles);
 
 export default router;

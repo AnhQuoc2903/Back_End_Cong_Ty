@@ -59,3 +59,31 @@ export async function deleteUser(req: Request, res: Response) {
   if (!u) return res.status(404).json({ message: "User not found" });
   res.json({ message: "Deleted" });
 }
+
+export async function searchUsers(req: Request, res: Response) {
+  const q = (req.query.q as string) || "";
+  const limit = Math.min(100, Number(req.query.limit) || 50);
+  const page = Math.max(1, Number(req.query.page) || 1);
+
+  const filter = q
+    ? {
+        $or: [
+          { email: { $regex: q, $options: "i" } },
+          { fullName: { $regex: q, $options: "i" } },
+          // { $text: { $search: q } },
+        ],
+      }
+    : {};
+
+  const [items, total] = await Promise.all([
+    User.find(filter)
+      .select("email fullName roles")
+      .populate("roles", "name")
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    User.countDocuments(filter),
+  ]);
+
+  res.json({ data: items, total });
+}

@@ -6,6 +6,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  searchCategories,
 } from "./category.controller";
 
 const router = Router();
@@ -17,5 +18,6 @@ router.get("/", requirePermission("VIEW_ARTIFACT"), getCategories);
 router.post("/", requirePermission("CREATE_ARTIFACT"), createCategory);
 router.patch("/:id", requirePermission("CREATE_ARTIFACT"), updateCategory);
 router.delete("/:id", requirePermission("CREATE_ARTIFACT"), deleteCategory);
+router.get("/search", searchCategories);
 
 export default router;
