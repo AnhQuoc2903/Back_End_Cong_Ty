@@ -18,29 +18,55 @@ export async function getArtifact(req: AuthRequest, res: Response) {
 }
 
 export async function createArtifact(req: AuthRequest, res: Response) {
-  const { code, name, description, categoryId, location, status } = req.body;
+  try {
+    const { code, name, description, categoryId, location, initialQuantity } =
+      req.body;
 
-  const existed = await Artifact.findOne({ code });
-  if (existed) {
-    return res.status(400).json({
-      field: "code",
-      message: "Mã hiện vật đã tồn tại",
+    const existed = await Artifact.findOne({ code });
+    if (existed) {
+      return res.status(400).json({
+        field: "code",
+        message: "Mã hiện vật đã tồn tại",
+      });
+    }
+
+    const qty = Number(initialQuantity ?? 0);
+    if (qty < 0) {
+      return res.status(400).json({
+        field: "initialQuantity",
+        message: "Số lượng ban đầu không hợp lệ",
+      });
+    }
+
+    const created = await Artifact.create({
+      code,
+      name,
+      description,
+      category: categoryId || null,
+      location,
+      status: "bosung",
+      quantityCurrent: qty,
+    });
+
+    if (qty > 0) {
+      await ArtifactTransaction.create({
+        artifact: created._id,
+        type: "IMPORT",
+        quantityChange: qty,
+        reason: "Khởi tạo số lượng ban đầu",
+        createdBy: req.user?.id,
+      });
+    }
+
+    const populated = await Artifact.findById(created._id).populate("category");
+
+    return res.status(201).json(populated);
+  } catch (err: any) {
+    console.error("createArtifact error:", err);
+    return res.status(500).json({
+      message: "Lỗi tạo hiện vật",
     });
   }
-
-  const created = await Artifact.create({
-    code,
-    name,
-    description,
-    category: categoryId || null,
-    location,
-    quantityCurrent: 0,
-    status: status || "bosung",
-  });
-
-  const populated = await Artifact.findById(created._id).populate("category");
-
-  res.status(201).json(populated);
 }
 
 export async function updateArtifact(req: AuthRequest, res: Response) {
