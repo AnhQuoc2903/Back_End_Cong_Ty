@@ -83,7 +83,6 @@ export async function analyzeImageCloudinary(imageUrl: string) {
       publicId = fallback.public_id;
       secureUrl = fallback.secure_url;
     } catch (err2) {
-      console.error("Upload/fetch error:", err2);
       throw new Error("Không thể upload/fetch ảnh lên Cloudinary");
     }
   }
@@ -151,7 +150,6 @@ export async function analyzeImageCloudinary(imageUrl: string) {
       .map((r: any) => r.secure_url)
       .filter(Boolean);
   } catch (err: any) {
-    console.warn("Search similar failed:", err.message || err);
     similarImages = [];
   }
 
