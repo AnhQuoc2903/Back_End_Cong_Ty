@@ -25,14 +25,29 @@ export async function analyzeImage(req: Request, res: Response) {
 
   try {
     const result = await analyzeImageCloudinary(imageUrl);
-    return res.json(result);
+
+    // quick fix: cast to any to avoid TS2339
+    const r = result as any;
+
+    const payload = {
+      labels: r.labels ?? [],
+      entities: r.entities ?? [], // safe
+      similarImages: r.similarImages ?? [],
+      pages: r.pages ?? [],
+      texts: r.texts ?? [],
+      _meta: {
+        publicId: r.publicId,
+        imageUrl: r.imageUrl,
+        similarSupported: r.similarSupported,
+      },
+    };
+
+    return res.json(payload);
   } catch (err: any) {
     console.error("[AI] Cloudinary analyze error:", err?.message || err);
-    return res
-      .status(500)
-      .json({
-        message: "Cloudinary AI error",
-        error: err?.message || String(err),
-      });
+    return res.status(500).json({
+      message: "Cloudinary AI error",
+      error: err?.message || String(err),
+    });
   }
 }

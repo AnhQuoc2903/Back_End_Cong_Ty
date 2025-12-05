@@ -18,6 +18,27 @@ type CloudinaryOCRResponse = {
   };
 };
 
+// src/services/cloudinaryAi.service.ts
+export type AnalysisPage = { url?: string; title?: string };
+
+export type AnalysisResult = {
+  publicId: string;
+  imageUrl: string;
+  labels: string[]; // tags
+  width?: number;
+  height?: number;
+  format?: string;
+  bytes?: number;
+  colors?: any[];
+  metadata?: any;
+  texts: string[]; // OCR texts
+  similarImages: string[];
+  similarSupported: boolean;
+  // optional fields for frontend expectations:
+  entities?: string[]; // web entities (if any)
+  pages?: AnalysisPage[]; // related pages (if any)
+};
+
 function uploadBuffer(
   buffer: Buffer,
   options: Record<string, any>
@@ -169,5 +190,8 @@ export async function analyzeImageCloudinary(imageUrl: string) {
     texts: ocrTexts,
     similarImages,
     similarSupported: similarImages.length > 0,
+    // ensure these exist (frontend expects them)
+    entities: [], // currently empty — you can populate if you add web entity extraction later
+    pages: [], // currently empty — you can populate if you add page extraction later
   };
 }
