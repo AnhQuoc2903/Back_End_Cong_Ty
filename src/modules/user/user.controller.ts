@@ -10,11 +10,19 @@ export async function getUsers(req: Request, res: Response) {
   res.json(users);
 }
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
 // POST /api/users
 export async function createUser(req: Request, res: Response) {
-  const { email, password, fullName, roleIds } = req.body;
+  const { email, password, fullName, roleIds, isActive } = req.body;
   if (!email || !password)
     return res.status(400).json({ message: "email & password required" });
+
+  if (!PASSWORD_REGEX.test(password)) {
+    return res.status(400).json({
+      message: "Mật khẩu phải ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số",
+    });
+  }
 
   const exists = await User.findOne({ email });
   if (exists) return res.status(400).json({ message: "Email existed" });
@@ -25,6 +33,7 @@ export async function createUser(req: Request, res: Response) {
     passwordHash,
     fullName,
     roles: roleIds || [],
+    isActive: isActive !== undefined ? isActive : true,
   });
 
   const full = await User.findById(user._id).populate({
@@ -77,7 +86,7 @@ export async function searchUsers(req: Request, res: Response) {
 
   const [items, total] = await Promise.all([
     User.find(filter)
-      .select("email fullName roles")
+      .select("email fullName roles isActive")
       .populate("roles", "name")
       .skip((page - 1) * limit)
       .limit(limit)

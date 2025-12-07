@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import crypto from "crypto";
+import bcrypt from "bcrypt";
 import { User } from "../../models/user.model";
 import { comparePassword } from "../../utils/password";
 import {
@@ -7,6 +9,11 @@ import {
   verifyRefreshToken,
 } from "../../utils/jwt";
 import { RefreshToken } from "../../models/refreshToken.model";
+import { sendEmail } from "../../utils/sendEmail";
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 // helper to build user payload (roles, permissions)
 async function buildUserPayload(user: any) {
@@ -40,6 +47,12 @@ export async function login(req: Request, res: Response) {
     const ok = await comparePassword(password, user.passwordHash);
     if (!ok)
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
+
+    if (user.isActive === false) {
+      return res
+        .status(403)
+        .json({ message: "Tài khoản đã bị khóa hoặc chưa kích hoạt" });
+    }
 
     const payload = await buildUserPayload(user);
     const accessToken = signAccessToken(payload);
@@ -143,3 +156,86 @@ export async function logout(req: Request, res: Response) {
     res.status(500).json({ message: "Server error" });
   }
 }
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email là bắt buộc" });
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({
+        message: "Nếu email tồn tại, hệ thống sẽ gửi mail hướng dẫn.",
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 60 * 60 * 1000);
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = expires;
+    await user.save();
+
+    const resetLink = `${FRONTEND_URL.replace(
+      /\/$/,
+      ""
+    )}/reset-password?token=${token}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Đặt lại mật khẩu",
+      html: `
+        <p>Chào ${user.fullName || user.email},</p>
+        <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
+        <p>Nhấn vào link sau để đặt lại mật khẩu (có hiệu lực 1 giờ):</p>
+        <p><a href="${resetLink}" target="_blank">${resetLink}</a></p>
+        <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+      `,
+    });
+
+    return res.json({
+      message: "Nếu email tồn tại, hệ thống sẽ gửi mail hướng dẫn.",
+    });
+  } catch (err) {
+    console.error("forgotPassword error:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+// ============ RESET PASSWORD ============
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ message: "Thiếu token hoặc mật khẩu mới" });
+    }
+
+    if (!PASSWORD_REGEX.test(password)) {
+      return res.status(400).json({
+        message: "Mật khẩu phải ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số",
+      });
+    }
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    user.passwordHash = passwordHash;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.json({ message: "Đặt lại mật khẩu thành công" });
+  } catch (err) {
+    console.error("resetPassword error:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+};
