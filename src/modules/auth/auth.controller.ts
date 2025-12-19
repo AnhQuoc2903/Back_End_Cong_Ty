@@ -12,7 +12,10 @@ import { RefreshToken } from "../../models/refreshToken.model";
 import { sendEmail } from "../../utils/sendEmail";
 
 const FRONTEND_URL =
-  process.env.FRONTEND_URL || "https://font-end-cong-ty.vercel.app/";
+  process.env.FRONTEND_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://quan-ly-hien-vat.online"
+    : "https://font-end-cong-ty.vercel.app");
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
