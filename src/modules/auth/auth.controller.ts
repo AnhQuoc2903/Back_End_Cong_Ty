@@ -11,7 +11,8 @@ import {
 import { RefreshToken } from "../../models/refreshToken.model";
 import { sendEmail } from "../../utils/sendEmail";
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://font-end-cong-ty.vercel.app/";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
