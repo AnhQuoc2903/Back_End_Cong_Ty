@@ -20,7 +20,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://font-end-cong-ty.vercel.app",
-      "https://quan-ly-hien-vat.online",
+      "https://www.quan-ly-hien-vat.online",
     ],
     credentials: true,
   })
