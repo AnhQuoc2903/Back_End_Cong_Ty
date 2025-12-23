@@ -164,14 +164,19 @@ export async function logout(req: Request, res: Response) {
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email là bắt buộc" });
+    if (!email) {
+      return res.status(400).json({ message: "Email là bắt buộc" });
+    }
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.json({
-        message: "Nếu email tồn tại, hệ thống sẽ gửi mail hướng dẫn.",
-      });
-    }
+
+    // luôn trả response giống nhau (tránh leak email)
+    res.json({
+      message: "Nếu email tồn tại, hệ thống sẽ gửi mail hướng dẫn.",
+    });
+
+    // nếu không có user thì dừng ở đây
+    if (!user) return;
 
     const token = crypto.randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 60 * 60 * 1000);
@@ -185,7 +190,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
       ""
     )}/reset-password?token=${token}`;
 
-    await sendEmail({
+    // gửi mail background – KHÔNG await
+    sendEmail({
       to: user.email,
       subject: "Đặt lại mật khẩu",
       html: `
@@ -195,13 +201,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
         <p><a href="${resetLink}" target="_blank">${resetLink}</a></p>
         <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
       `,
-    });
-
-    return res.json({
-      message: "Nếu email tồn tại, hệ thống sẽ gửi mail hướng dẫn.",
+    }).catch((err) => {
+      console.error("Send email failed:", err);
     });
   } catch (err) {
-    console.error("forgotPassword error:", err);
+    console.error("forgotPassword fatal error:", err);
     return res.status(500).json({ message: "Lỗi server" });
   }
 };

@@ -7,8 +7,6 @@ export interface IUser extends Document {
   roles: Types.ObjectId[];
 
   isActive: boolean;
-
-  // dùng cho chức năng quên mật khẩu
   resetPasswordToken?: string | null;
   resetPasswordExpires?: Date | null;
 }

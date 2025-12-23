@@ -2,9 +2,14 @@ import { Response } from "express";
 import { AuthRequest } from "../../middleware/auth";
 import { Artifact } from "../../models/artifact.model";
 import { ArtifactTransaction } from "../../models/artifactTransaction.model";
+import cloudinary from "../../config/cloudinary";
 
 export async function getArtifacts(req: AuthRequest, res: Response) {
-  const artifacts = await Artifact.find().populate("category").lean();
+  const artifacts = await Artifact.find()
+    .populate("category")
+    .sort({ createdAt: -1 }) // ✅ mới nhất lên đầu
+    .lean();
+
   res.json(artifacts);
 }
 
@@ -46,6 +51,7 @@ export async function createArtifact(req: AuthRequest, res: Response) {
       location,
       status: "bosung",
       quantityCurrent: qty,
+      images: [],
     });
 
     if (qty > 0) {
@@ -81,12 +87,17 @@ export async function updateArtifact(req: AuthRequest, res: Response) {
   if (typeof categoryId !== "undefined")
     updateData.category = categoryId || null;
 
-  const existed = await Artifact.findOne({ code, _id: { $ne: artifactId } });
-  if (existed) {
-    return res.status(400).json({
-      field: "code",
-      message: "Mã hiện vật này đã tồn tại",
+  if (code !== undefined) {
+    const existed = await Artifact.findOne({
+      code,
+      _id: { $ne: artifactId },
     });
+    if (existed) {
+      return res.status(400).json({
+        field: "code",
+        message: "Mã hiện vật này đã tồn tại",
+      });
+    }
   }
 
   const artifact = await Artifact.findByIdAndUpdate(req.params.id, updateData, {
@@ -105,10 +116,17 @@ export async function deleteArtifact(req: AuthRequest, res: Response) {
   if (!artifact)
     return res.status(404).json({ message: "Không tìm thấy hiện vật" });
 
-  // nếu muốn xóa transaction liên quan thì uncomment
-  // await ArtifactTransaction.deleteMany({ artifact: artifactId });
+  // ✅ xóa tất cả ảnh cloudinary
+  if (artifact.images?.length) {
+    await Promise.allSettled(
+      artifact.images.map((img: any) =>
+        cloudinary.uploader.destroy(img.publicId)
+      )
+    );
+  }
 
   await Artifact.findByIdAndDelete(artifactId);
+
   res.json({ message: "Đã xóa hiện vật" });
 }
 

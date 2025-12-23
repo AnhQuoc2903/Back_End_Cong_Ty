@@ -6,67 +6,87 @@ import streamifier from "streamifier";
 
 export async function uploadArtifactImage(req: AuthRequest, res: Response) {
   const artifactId = req.params.id;
-  if (!req.file || !req.file.buffer)
-    return res
-      .status(400)
-      .json({ message: "No file uploaded or buffer missing" });
+
+  if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+    return res.status(400).json({ message: "No files uploaded" });
+  }
 
   try {
-    const buffer = req.file.buffer;
-    const streamUpload = (buffer: Buffer) =>
+    // ✅ 1️⃣ LẤY ARTIFACT TRƯỚC
+    const artifact = await Artifact.findById(artifactId);
+    if (!artifact) {
+      return res.status(404).json({ message: "Artifact not found" });
+    }
+
+    // ✅ 2️⃣ CHECK GIỚI HẠN 5 ẢNH (CHỖ QUAN TRỌNG NHẤT)
+    const currentCount = artifact.images?.length ?? 0;
+    const uploadCount = req.files.length;
+
+    if (currentCount + uploadCount > 5) {
+      return res.status(400).json({
+        message: "Mỗi hiện vật chỉ được tối đa 5 ảnh",
+      });
+    }
+
+    // ✅ 3️⃣ SAU ĐÓ MỚI UPLOAD CLOUDINARY
+    const uploadOne = (buffer: Buffer) =>
       new Promise<any>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { folder: "artifacts", resource_type: "image" },
           (error, result) => {
-            if (error) {
-              console.error("Cloudinary upload error:", error);
-              return reject(error);
-            }
+            if (error) return reject(error);
             resolve(result);
           }
         );
         streamifier.createReadStream(buffer).pipe(uploadStream);
       });
 
-    const result = await streamUpload(buffer);
+    const results = await Promise.all(
+      (req.files as Express.Multer.File[]).map((file) => uploadOne(file.buffer))
+    );
+
+    const images = results.map((r) => ({
+      url: r.secure_url,
+      publicId: r.public_id,
+    }));
+
     const updated = await Artifact.findByIdAndUpdate(
       artifactId,
-      { imageUrl: result.secure_url, imagePublicId: result.public_id },
+      { $push: { images: { $each: images } } },
       { new: true }
     ).populate("category");
-    return res.json({
-      imageUrl: result.secure_url,
-      publicId: result.public_id,
-      artifact: updated,
-    });
+
+    return res.json({ images, artifact: updated });
   } catch (err: any) {
-    console.error("Upload error (full):", err);
-    if (err && err.http_code)
-      return res
-        .status(err.http_code)
-        .json({ message: err.message || "Cloudinary error", details: err });
-    return res
-      .status(500)
-      .json({ message: "Upload failed", error: String(err) });
+    console.error("Upload error:", err);
+    return res.status(500).json({ message: "Upload failed" });
   }
 }
 
 export async function deleteArtifactImage(req: AuthRequest, res: Response) {
-  const artifactId = req.params.id;
-  const artifact = await Artifact.findById(artifactId);
-  if (!artifact) return res.status(404).json({ message: "Artifact not found" });
+  const { id, publicId } = req.params;
+  const decodedPublicId = decodeURIComponent(publicId);
 
   try {
-    if (artifact.imagePublicId)
-      await cloudinary.uploader.destroy(artifact.imagePublicId);
-    artifact.imagePublicId = undefined as any;
-    artifact.imageUrl = undefined as any;
-    await artifact.save();
-    return res.json({ message: "Image deleted" });
+    const artifact = await Artifact.findById(id);
+    if (!artifact) {
+      return res.status(404).json({ message: "Artifact not found" });
+    }
+
+    const updated = await Artifact.findByIdAndUpdate(
+      id,
+      { $pull: { images: { publicId: decodedPublicId } } },
+      { new: true }
+    );
+
+    await cloudinary.uploader.destroy(decodedPublicId);
+
+    return res.json({
+      message: "Image deleted",
+      images: updated?.images,
+    });
   } catch (err) {
-    console.error("Delete image error:", err);
-    return res
-      .status(500)
-      .json({ message: "Delete failed", error: String(err) });
+    console.error(err);
+    return res.status(500).json({ message: "Delete failed" });
   }
 }

@@ -18,6 +18,8 @@ import {
 } from "./artifact.image.controller";
 import { upload } from "../../middleware/upload";
 
+import { exportArtifactsExcel } from "./artifact.export.controller";
+
 const router = Router();
 
 router.use(authMiddleware);
@@ -49,15 +51,18 @@ router.get(
 );
 router.delete("/:id", requirePermission("DELETE_ARTIFACT"), deleteArtifact);
 router.post(
-  "/:id/image",
+  "/:id/images",
   requirePermission("EDIT_ARTIFACT"),
-  upload.single("file"),
+  upload.array("files", 5),
   uploadArtifactImage
 );
+
 router.delete(
-  "/:id/image",
+  "/:id/images/:publicId",
   requirePermission("EDIT_ARTIFACT"),
   deleteArtifactImage
 );
+
+router.get("/export/excel", exportArtifactsExcel);
 
 export default router;
