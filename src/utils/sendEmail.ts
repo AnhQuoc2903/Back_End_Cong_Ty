@@ -16,7 +16,7 @@ export async function sendEmail({
 }: SendEmailOptions): Promise<void> {
   try {
     await resend.emails.send({
-      from: "MuseumPro <onboarding@resend.dev>",
+      from: "MuseumPro <support@quan-ly-hien-vat.online>",
       to,
       subject,
       html,
