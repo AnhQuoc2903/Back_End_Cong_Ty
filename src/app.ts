@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
+import cookieParser from "cookie-parser";
 
 import authRoutes from "./modules/auth/auth.routes";
 import artifactRoutes from "./modules/artifacts/artifact.routes";
@@ -12,6 +13,9 @@ import userRoutes from "./modules/user/user.routes";
 import roleRoutes from "./modules/roles/role.routes";
 
 const app = express();
+
+// 🔐 BẮT BUỘC khi dùng HTTPS / cookie secure
+app.set("trust proxy", 1);
 
 app.use(helmet());
 
@@ -26,6 +30,9 @@ app.use(
   })
 );
 
+// 🔥 COOKIE PARSER – PHẢI TRƯỚC ROUTES
+app.use(cookieParser());
+
 app.use(express.json());
 
 const authLimiter = rateLimit({
@@ -33,6 +40,16 @@ const authLimiter = rateLimit({
   max: 100,
 });
 
+// routes
+app.use("/api/auth", authLimiter);
+app.use("/api/auth", authRoutes);
+app.use("/api/artifacts", artifactRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/roles", roleRoutes);
+app.use("/api/ai", aiRoutes);
+
+// error handler (để CUỐI)
 app.use(
   (
     err: any,
@@ -48,15 +65,5 @@ app.use(
     return res.status(500).json({ message: "Internal server error" });
   }
 );
-
-app.use("/api/auth", authLimiter);
-
-// 👇 mount routes SAU khi đã dùng cors + json + helmet
-app.use("/api/auth", authRoutes);
-app.use("/api/artifacts", artifactRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/ai", aiRoutes);
 
 export default app;

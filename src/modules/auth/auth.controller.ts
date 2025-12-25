@@ -22,29 +22,42 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 // helper to build user payload (roles, permissions)
 async function buildUserPayload(user: any) {
   const roles = (user.roles || []).map((r: any) => r.name);
+
   const permsSet = new Set<string>();
   (user.roles || []).forEach((r: any) => {
     (r.permissions || []).forEach((p: any) => permsSet.add(p.name));
   });
-  const permissions = Array.from(permsSet);
-  return { id: user._id.toString(), email: user.email, roles, permissions };
+
+  return {
+    id: user._id.toString(),
+    email: user.email,
+    roles,
+    permissions: Array.from(permsSet),
+  };
 }
 
 // create & persist refresh token (one-time rotation)
 async function persistRefreshToken(userId: string) {
   const token = signRefreshToken({ id: userId });
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  await RefreshToken.create({ user: userId, token, expiresAt });
+
+  await RefreshToken.create({
+    user: userId,
+    token,
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+
   return token;
 }
 
 export async function login(req: Request, res: Response) {
   try {
     const { email, password } = req.body;
+
     const user: any = await User.findOne({ email }).populate({
       path: "roles",
       populate: { path: "permissions" },
     });
+
     if (!user)
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
 
@@ -52,19 +65,29 @@ export async function login(req: Request, res: Response) {
     if (!ok)
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
 
-    if (user.isActive === false) {
-      return res
-        .status(403)
-        .json({ message: "Tài khoản đã bị khóa hoặc chưa kích hoạt" });
-    }
+    if (user.isActive === false)
+      return res.status(403).json({ message: "Tài khoản bị khóa" });
 
     const payload = await buildUserPayload(user);
+
     const accessToken = signAccessToken(payload);
     const refreshToken = await persistRefreshToken(user._id.toString());
 
+    /**
+     * 🔥 QUAN TRỌNG
+     * LƯU refreshToken VÀO HTTPONLY COOKIE
+     * → KHÔNG trả về frontend
+     */
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/api/auth/refresh",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
     return res.json({
       accessToken,
-      refreshToken,
       user: {
         id: user._id,
         email: user.email,
@@ -81,56 +104,55 @@ export async function login(req: Request, res: Response) {
 
 export async function refreshToken(req: Request, res: Response) {
   try {
-    const { refreshToken } = req.body;
+    /**
+     * 🔥 SỬA Ở ĐÂY
+     * LẤY refreshToken TỪ COOKIE
+     */
+    const refreshToken = req.cookies.refreshToken;
     if (!refreshToken)
-      return res.status(400).json({ message: "Missing refresh token" });
+      return res.status(401).json({ message: "Missing refresh token" });
 
     const stored = await RefreshToken.findOne({ token: refreshToken });
-
-    // not found or revoked
-    if (!stored || stored.revoked) {
+    if (!stored || stored.revoked)
       return res.status(401).json({ message: "Invalid refresh token" });
-    }
 
-    // verify JWT
     let payload: any;
     try {
-      payload = verifyRefreshToken(refreshToken) as any;
-    } catch (err) {
-      // token invalid/expired: mark revoked in DB and reject
-      try {
-        await RefreshToken.findOneAndUpdate(
-          { token: refreshToken },
-          { revoked: true }
-        );
-      } catch (e) {
-        console.warn("failed to revoke refresh token", e);
-      }
-      return res
-        .status(401)
-        .json({ message: "Refresh token expired or invalid" });
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      await RefreshToken.findOneAndUpdate(
+        { token: refreshToken },
+        { revoked: true }
+      );
+      return res.status(401).json({ message: "Refresh token expired" });
     }
 
-    // ensure user exists
     const user = await User.findById(payload.id).populate({
       path: "roles",
       populate: { path: "permissions" },
     });
+
     if (!user) return res.status(401).json({ message: "User not found" });
 
-    // rotation: delete old refresh token record (one-time use)
+    // 🔥 ROTATE refresh token
     await RefreshToken.findOneAndDelete({ token: refreshToken });
-
-    // create new refresh token
     const newRefreshToken = await persistRefreshToken(user._id.toString());
 
-    // create new access token with full payload (roles/permissions)
     const newPayload = await buildUserPayload(user);
     const accessToken = signAccessToken(newPayload);
 
+    /**
+     * 🔥 SET COOKIE MỚI
+     */
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
     return res.json({
       accessToken,
-      refreshToken: newRefreshToken,
       user: {
         id: user._id,
         email: user.email,
@@ -147,17 +169,29 @@ export async function refreshToken(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
-    const { refreshToken } = req.body;
+    /**
+     * 🔥 LẤY refreshToken TỪ COOKIE
+     */
+    const refreshToken = req.cookies.refreshToken;
+
     if (refreshToken) {
       await RefreshToken.findOneAndUpdate(
         { token: refreshToken },
         { revoked: true }
       );
     }
+
+    /**
+     * 🔥 XÓA COOKIE
+     */
+    res.clearCookie("refreshToken", {
+      path: "/api/auth/refresh",
+    });
+
     return res.json({ message: "Đã đăng xuất" });
   } catch (err) {
     console.error("logout error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 }
 

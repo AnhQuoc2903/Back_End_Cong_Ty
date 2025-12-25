@@ -3,6 +3,7 @@ import { AuthRequest } from "../../middleware/auth";
 import cloudinary from "../../config/cloudinary";
 import { Artifact } from "../../models/artifact.model";
 import streamifier from "streamifier";
+import { io } from "../../server";
 
 export async function uploadArtifactImage(req: AuthRequest, res: Response) {
   const artifactId = req.params.id;
@@ -56,6 +57,11 @@ export async function uploadArtifactImage(req: AuthRequest, res: Response) {
       { new: true }
     ).populate("category");
 
+    io.emit("artifact:image:changed", {
+      artifactId,
+      type: "upload",
+    });
+
     return res.json({ images, artifact: updated });
   } catch (err: any) {
     console.error("Upload error:", err);
@@ -80,6 +86,11 @@ export async function deleteArtifactImage(req: AuthRequest, res: Response) {
     );
 
     await cloudinary.uploader.destroy(decodedPublicId);
+
+    io.emit("artifact:image:changed", {
+      artifactId: id,
+      type: "delete",
+    });
 
     return res.json({
       message: "Image deleted",

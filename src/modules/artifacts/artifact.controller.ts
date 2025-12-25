@@ -3,6 +3,7 @@ import { AuthRequest } from "../../middleware/auth";
 import { Artifact } from "../../models/artifact.model";
 import { ArtifactTransaction } from "../../models/artifactTransaction.model";
 import cloudinary from "../../config/cloudinary";
+import { io } from "../../server";
 
 export async function getArtifacts(req: AuthRequest, res: Response) {
   const artifacts = await Artifact.find()
@@ -66,6 +67,8 @@ export async function createArtifact(req: AuthRequest, res: Response) {
 
     const populated = await Artifact.findById(created._id).populate("category");
 
+    io.emit("artifact:changed");
+
     return res.status(201).json(populated);
   } catch (err: any) {
     console.error("createArtifact error:", err);
@@ -107,6 +110,7 @@ export async function updateArtifact(req: AuthRequest, res: Response) {
     .lean();
   if (!artifact)
     return res.status(404).json({ message: "Không tìm thấy hiện vật" });
+  io.emit("artifact:changed");
   res.json(artifact);
 }
 
@@ -127,6 +131,8 @@ export async function deleteArtifact(req: AuthRequest, res: Response) {
 
   await Artifact.findByIdAndDelete(artifactId);
 
+  io.emit("artifact:changed");
+
   res.json({ message: "Đã xóa hiện vật" });
 }
 
@@ -145,6 +151,7 @@ export async function importArtifact(req: AuthRequest, res: Response) {
     $inc: { quantityCurrent: quantity },
     status: "bosung",
   });
+  io.emit("artifact:changed");
   res.status(201).json(tx);
 }
 
@@ -169,6 +176,7 @@ export async function exportArtifact(req: AuthRequest, res: Response) {
     $inc: { quantityCurrent: -quantity },
     status: newQty <= 0 ? "ban" : "con",
   });
+  io.emit("artifact:changed");
   res.status(201).json(tx);
 }
 

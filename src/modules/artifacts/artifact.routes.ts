@@ -24,6 +24,12 @@ const router = Router();
 
 router.use(authMiddleware);
 
+router.get(
+  "/export/excel",
+  requirePermission("EXPORT_ARTIFACT"),
+  exportArtifactsExcel
+);
+
 router.get("/", requirePermission("VIEW_ARTIFACT"), getArtifacts);
 router.get("/:id", requirePermission("VIEW_ARTIFACT"), getArtifact);
 router.post("/", requirePermission("CREATE_ARTIFACT"), createArtifact);
@@ -62,7 +68,5 @@ router.delete(
   requirePermission("EDIT_ARTIFACT"),
   deleteArtifactImage
 );
-
-router.get("/export/excel", exportArtifactsExcel);
 
 export default router;
