@@ -6,6 +6,7 @@ import { hashPassword } from "../../utils/password";
 export async function getUsers(req: Request, res: Response) {
   const users = await User.find()
     .populate({ path: "roles", populate: { path: "permissions" } })
+    .populate("department")
     .lean();
   res.json(users);
 }
@@ -14,7 +15,8 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 // POST /api/users
 export async function createUser(req: Request, res: Response) {
-  const { email, password, fullName, roleIds, isActive } = req.body;
+  const { email, password, fullName, roleIds, departmentId, isActive } =
+    req.body;
   if (!email || !password)
     return res.status(400).json({ message: "email & password required" });
 
@@ -33,6 +35,7 @@ export async function createUser(req: Request, res: Response) {
     passwordHash,
     fullName,
     roles: roleIds || [],
+    department: departmentId || null,
     isActive: isActive !== undefined ? isActive : true,
   });
 
@@ -45,18 +48,21 @@ export async function createUser(req: Request, res: Response) {
 
 // PATCH /api/users/:id
 export async function updateUser(req: Request, res: Response) {
-  const { fullName, roleIds, isActive } = req.body;
+  const { fullName, roleIds, departmentId, isActive } = req.body;
   const update: any = {};
   if (fullName !== undefined) update.fullName = fullName;
   if (roleIds !== undefined) update.roles = roleIds;
+  if (departmentId !== undefined) update.department = departmentId;
   if (isActive !== undefined) update.isActive = isActive;
 
   const user = await User.findByIdAndUpdate(req.params.id, update, {
     new: true,
-  }).populate({
-    path: "roles",
-    populate: { path: "permissions" },
-  });
+  })
+    .populate({
+      path: "roles",
+      populate: { path: "permissions" },
+    })
+    .populate("department");
 
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json(user);

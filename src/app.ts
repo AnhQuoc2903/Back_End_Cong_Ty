@@ -11,6 +11,7 @@ import categoryRoutes from "./modules/categories/category.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import userRoutes from "./modules/user/user.routes";
 import roleRoutes from "./modules/roles/role.routes";
+import departmentRoutes from "./modules/department/department.routes";
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/departments", departmentRoutes);
 
 // error handler (để CUỐI)
 app.use(
