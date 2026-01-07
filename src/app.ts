@@ -13,6 +13,7 @@ import userRoutes from "./modules/user/user.routes";
 import roleRoutes from "./modules/roles/role.routes";
 import departmentRoutes from "./modules/department/department.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
+import activityLogRoutes from "./modules/activity/activity-log.routes";
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use("/api/roles", roleRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/activity-logs", activityLogRoutes);
 
 // error handler (để CUỐI)
 app.use(

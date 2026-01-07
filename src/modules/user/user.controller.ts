@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { User } from "../../models/user.model";
 import { hashPassword } from "../../utils/password";
+import { AuthRequest } from "../../middleware/auth";
+import { logActivity } from "../../utils/activity-log";
+import { Types } from "mongoose";
 
 // GET /api/users
 export async function getUsers(req: Request, res: Response) {
@@ -14,7 +17,7 @@ export async function getUsers(req: Request, res: Response) {
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 // POST /api/users
-export async function createUser(req: Request, res: Response) {
+export async function createUser(req: AuthRequest, res: Response) {
   const { email, password, fullName, roleIds, departmentId, isActive } =
     req.body;
   if (!email || !password)
@@ -39,6 +42,37 @@ export async function createUser(req: Request, res: Response) {
     isActive: isActive !== undefined ? isActive : true,
   });
 
+  const actor = await User.findById(req.user!.id)
+    .select("email fullName")
+    .lean();
+
+  await logActivity({
+    actorId: new Types.ObjectId(req.user!.id),
+    actorSnapshot: {
+      _id: new Types.ObjectId(req.user!.id),
+      email: actor?.email,
+      fullName: actor?.fullName,
+    },
+    action: "CREATE_USER",
+    targetType: "User",
+    targetId: user._id,
+    targetSnapshot: {
+      _id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+    },
+
+    after: {
+      email: user.email,
+      fullName: user.fullName,
+      roles: user.roles,
+      department: user.department,
+      isActive: user.isActive,
+    },
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
   const full = await User.findById(user._id).populate({
     path: "roles",
     populate: { path: "permissions" },
@@ -47,31 +81,138 @@ export async function createUser(req: Request, res: Response) {
 }
 
 // PATCH /api/users/:id
-export async function updateUser(req: Request, res: Response) {
+// PATCH /api/users/:id
+export async function updateUser(req: AuthRequest, res: Response) {
   const { fullName, roleIds, departmentId, isActive } = req.body;
+
   const update: any = {};
   if (fullName !== undefined) update.fullName = fullName;
   if (roleIds !== undefined) update.roles = roleIds;
   if (departmentId !== undefined) update.department = departmentId;
   if (isActive !== undefined) update.isActive = isActive;
 
-  const user = await User.findByIdAndUpdate(req.params.id, update, {
+  // ===== USER TRƯỚC =====
+  const beforeUser = await User.findById(req.params.id)
+    .populate("roles", "name")
+    .populate("department", "name")
+    .lean();
+
+  if (!beforeUser) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  // ===== UPDATE =====
+  const updatedUser = await User.findByIdAndUpdate(req.params.id, update, {
     new: true,
   })
-    .populate({
-      path: "roles",
-      populate: { path: "permissions" },
-    })
-    .populate("department");
+    .populate("roles", "name")
+    .populate("department", "name")
+    .lean();
 
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json(user);
+  if (!updatedUser) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  // ===== SO SÁNH =====
+  const beforeLog: any = {};
+  const afterLog: any = {};
+
+  // HỌ TÊN
+  if (beforeUser.fullName !== updatedUser.fullName) {
+    beforeLog.fullName = beforeUser.fullName || "(Trống)";
+    afterLog.fullName = updatedUser.fullName || "(Trống)";
+  }
+
+  // TRẠNG THÁI
+  if (beforeUser.isActive !== updatedUser.isActive) {
+    beforeLog.isActive = beforeUser.isActive ? "Hoạt động" : "Ngưng hoạt động";
+    afterLog.isActive = updatedUser.isActive ? "Hoạt động" : "Ngưng hoạt động";
+  }
+
+  // ROLE
+  const beforeRoles = (beforeUser.roles as any[]).map((r) => r.name).join(", ");
+  const afterRoles = (updatedUser.roles as any[]).map((r) => r.name).join(", ");
+
+  if (beforeRoles !== afterRoles) {
+    beforeLog.roles = beforeRoles || "(Không có)";
+    afterLog.roles = afterRoles || "(Không có)";
+  }
+
+  // PHÒNG BAN
+  const beforeDept = (beforeUser.department as any)?.name || "(Không có)";
+  const afterDept = (updatedUser.department as any)?.name || "(Không có)";
+
+  if (beforeDept !== afterDept) {
+    beforeLog.department = beforeDept;
+    afterLog.department = afterDept;
+  }
+
+  // ===== LOG =====
+  if (Object.keys(beforeLog).length > 0) {
+    const actor = await User.findById(req.user!.id)
+      .select("email fullName")
+      .lean();
+
+    await logActivity({
+      actorId: new Types.ObjectId(req.user!.id),
+      actorSnapshot: {
+        _id: new Types.ObjectId(req.user!.id),
+        email: actor?.email,
+        fullName: actor?.fullName,
+      },
+      action: "UPDATE_USER",
+      targetType: "User",
+      targetId: updatedUser._id,
+      targetSnapshot: {
+        _id: updatedUser._id,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+      },
+      before: beforeLog,
+      after: afterLog,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+  }
+
+  res.json(updatedUser);
 }
 
 // DELETE /api/users/:id
-export async function deleteUser(req: Request, res: Response) {
-  const u = await User.findByIdAndDelete(req.params.id);
-  if (!u) return res.status(404).json({ message: "User not found" });
+export async function deleteUser(req: AuthRequest, res: Response) {
+  const before = await User.findById(req.params.id).lean();
+  if (!before) return res.status(404).json({ message: "User not found" });
+
+  const actor = await User.findById(req.user!.id)
+    .select("email fullName")
+    .lean();
+
+  await User.findByIdAndDelete(req.params.id);
+
+  await logActivity({
+    actorId: new Types.ObjectId(req.user!.id),
+    actorSnapshot: {
+      _id: new Types.ObjectId(req.user!.id),
+      email: actor?.email,
+      fullName: actor?.fullName,
+    },
+    action: "DELETE_USER",
+    targetType: "User",
+    targetId: before._id,
+    targetSnapshot: {
+      // 🔥 QUAN TRỌNG NHẤT
+      _id: before._id,
+      email: before.email,
+      fullName: before.fullName,
+    },
+    before: {
+      email: before.email,
+      fullName: before.fullName,
+    },
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
   res.json({ message: "Deleted" });
 }
 
