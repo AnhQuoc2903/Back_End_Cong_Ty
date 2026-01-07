@@ -17,8 +17,15 @@ const server = http.createServer(app);
 // 🔥 KHỞI TẠO SOCKET
 export const io = new Server(server, {
   cors: {
-    origin: "*", // frontend url nếu muốn giới hạn
+    origin: [
+      "http://localhost:5173",
+      "https://www.quan-ly-hien-vat.online",
+      "https://font-end-cong-ty.vercel.app",
+    ],
+    methods: ["GET", "POST"],
+    credentials: true,
   },
+  transports: ["websocket", "polling"],
 });
 
 // 🔥 LẮNG NGHE KẾT NỐI
