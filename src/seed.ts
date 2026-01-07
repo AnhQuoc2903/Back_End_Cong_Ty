@@ -56,6 +56,17 @@ async function seed() {
       group: "Hiện vật",
     },
 
+    {
+      name: "EXPORT_ARTIFACT_TRANSACTIONS",
+      description: "Xuất file excel lịch sử giao dịch",
+      group: "Hiện vật",
+    },
+    {
+      name: "EXPORT_LIST_OF__ARTIFACT",
+      description: "Xuất file excel danh sách hiện vật",
+      group: "Hiện vật",
+    },
+
     // ===== CATEGORY =====
     {
       name: "VIEW_CATEGORY",

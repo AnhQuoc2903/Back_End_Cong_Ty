@@ -2,6 +2,7 @@ import { Schema, model, Document } from "mongoose";
 
 export interface IDepartment extends Document {
   name: string;
+  description?: string;
   isActive: boolean;
 }
 
@@ -13,6 +14,11 @@ const departmentSchema = new Schema<IDepartment>(
       unique: true,
       trim: true,
       maxlength: 50,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
     },
     isActive: {
       type: Boolean,

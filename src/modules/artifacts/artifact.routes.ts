@@ -20,14 +20,22 @@ import { upload } from "../../middleware/upload";
 
 import { exportArtifactsExcel } from "./artifact.export.controller";
 
+import { exportArtifactTransactionsExcel } from "./artifact.export.controller.transaction";
+
 const router = Router();
 
 router.use(authMiddleware);
 
 router.get(
   "/export/excel",
-  requirePermission("EXPORT_ARTIFACT"),
+  requirePermission("EXPORT_LIST_OF__ARTIFACT"),
   exportArtifactsExcel
+);
+
+router.get(
+  "/:id/transactions/export-excel",
+  requirePermission("EXPORT_ARTIFACT_TRANSACTIONS"),
+  exportArtifactTransactionsExcel
 );
 
 router.get("/", requirePermission("VIEW_ARTIFACT"), getArtifacts);

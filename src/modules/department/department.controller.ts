@@ -26,7 +26,7 @@ export async function getActiveDepartments(req: Request, res: Response) {
  * POST /api/departments
  */
 export async function createDepartment(req: Request, res: Response) {
-  const { name } = req.body;
+  const { name, description } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({
@@ -46,6 +46,7 @@ export async function createDepartment(req: Request, res: Response) {
 
   const department = await Department.create({
     name: name.trim(),
+    description: description?.trim() || "",
   });
 
   res.status(201).json(department);
@@ -56,10 +57,11 @@ export async function createDepartment(req: Request, res: Response) {
  * 👉 đổi tên / bật tắt
  */
 export async function updateDepartment(req: Request, res: Response) {
-  const { name, isActive } = req.body;
+  const { name, isActive, description } = req.body;
 
   const update: any = {};
   if (name !== undefined) update.name = name.trim();
+  if (description !== undefined) update.description = description.trim();
   if (isActive !== undefined) update.isActive = isActive;
 
   const department = await Department.findByIdAndUpdate(req.params.id, update, {
