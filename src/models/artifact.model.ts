@@ -9,8 +9,6 @@ const artifactSchema = new Schema(
     location: String,
     status: { type: String, default: "bosung" },
     quantityCurrent: { type: Number, default: 0 },
-
-    // ✅ nhiều ảnh
     images: [
       {
         url: { type: String, required: true },

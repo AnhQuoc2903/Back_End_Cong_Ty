@@ -53,10 +53,12 @@ export async function login(req: Request, res: Response) {
   try {
     const { email, password } = req.body;
 
-    const user: any = await User.findOne({ email }).populate({
-      path: "roles",
-      populate: { path: "permissions" },
-    });
+    const user: any = await User.findOne({ email })
+      .populate({
+        path: "roles",
+        populate: { path: "permissions" },
+      })
+      .populate("department");
 
     if (!user)
       return res.status(400).json({ message: "Sai email hoặc mật khẩu" });
@@ -94,6 +96,7 @@ export async function login(req: Request, res: Response) {
         fullName: user.fullName,
         roles: payload.roles,
         permissions: payload.permissions,
+        department: user.department,
       },
     });
   } catch (err) {

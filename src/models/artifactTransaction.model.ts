@@ -9,6 +9,8 @@ const artifactTransactionSchema = new Schema(
       required: true,
     },
     quantityChange: { type: Number, required: true },
+    previousQuantity: { type: Number },
+    newQuantity: { type: Number }, // ✅ nhiều ảnh
     reason: String,
     createdBy: { type: Types.ObjectId, ref: "User" },
   },

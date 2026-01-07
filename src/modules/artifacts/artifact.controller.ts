@@ -205,6 +205,8 @@ export async function adjustArtifact(req: AuthRequest, res: Response) {
     artifact: artifactId,
     type: "ADJUST",
     quantityChange: diff,
+    previousQuantity: oldQty, // ✅ QUAN TRỌNG
+    newQuantity: newQuantity,
     reason,
     createdBy: req.user?.id,
   });
@@ -213,5 +215,6 @@ export async function adjustArtifact(req: AuthRequest, res: Response) {
     quantityCurrent: newQuantity,
     status: newQuantity <= 0 ? "ban" : "con",
   });
+  io.emit("artifact:changed");
   res.status(201).json(tx);
 }

@@ -3,6 +3,19 @@ import { ArtifactTransaction } from "../../models/artifactTransaction.model";
 import { Artifact } from "../../models/artifact.model";
 import ExcelJS from "exceljs";
 
+const mapTransactionType = (type: string) => {
+  switch (type) {
+    case "IMPORT":
+      return "Nhập kho";
+    case "EXPORT":
+      return "Xuất kho";
+    case "ADJUST":
+      return "Điều chỉnh";
+    default:
+      return type;
+  }
+};
+
 /**
  * GET /api/dashboard/monthly-stats
  */
@@ -22,7 +35,11 @@ export const getMonthlyStats = async (req: Request, res: Response) => {
           },
           exports: {
             $sum: {
-              $cond: [{ $eq: ["$type", "EXPORT"] }, "$quantityChange", 0],
+              $cond: [
+                { $eq: ["$type", "EXPORT"] },
+                { $abs: "$quantityChange" },
+                0,
+              ],
             },
           },
 
@@ -171,7 +188,7 @@ export const exportDashboardTransactionsExcel = async (
       date: new Date(t.createdAt).toLocaleString("vi-VN"),
       code: artifact?.code || "",
       name: artifact?.name || "Không xác định",
-      type: t.type,
+      type: mapTransactionType(t.type),
       quantity: t.quantityChange,
     });
   });
@@ -193,4 +210,20 @@ export const exportDashboardTransactionsExcel = async (
 
   await workbook.xlsx.write(res);
   res.end();
+};
+
+// GET /api/dashboard/recent-transactions?page=1&limit=10
+export const getRecentTransactions = async (req: Request, res: Response) => {
+  try {
+    const transactions = await ArtifactTransaction.find()
+      .sort({ createdAt: -1 }) // mới nhất lên trên
+      .populate("artifact", "name code")
+      .populate("createdBy", "fullName email")
+      .lean();
+
+    res.json(transactions);
+  } catch (err) {
+    console.error("getRecentTransactions error:", err);
+    res.status(500).json({ message: "Không lấy được giao dịch gần đây" });
+  }
 };
