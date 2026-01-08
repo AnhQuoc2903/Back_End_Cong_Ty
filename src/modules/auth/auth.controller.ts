@@ -10,6 +10,7 @@ import {
 } from "../../utils/jwt";
 import { RefreshToken } from "../../models/refreshToken.model";
 import { sendEmail } from "../../utils/sendEmail";
+import type { CookieOptions } from "express";
 
 const FRONTEND_URL =
   process.env.FRONTEND_URL ||
@@ -18,6 +19,19 @@ const FRONTEND_URL =
     : "https://font-end-cong-ty.vercel.app");
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+const isProd = process.env.NODE_ENV === "production";
+
+const REFRESH_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
+  ...(isProd && {
+    domain: ".quan-ly-hien-vat.online",
+  }),
+  path: "/api/auth/refresh",
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+};
 
 // helper to build user payload (roles, permissions)
 async function buildUserPayload(user: any) {
@@ -80,13 +94,7 @@ export async function login(req: Request, res: Response) {
      * LƯU refreshToken VÀO HTTPONLY COOKIE
      * → KHÔNG trả về frontend
      */
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/api/auth/refresh",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("refreshToken", refreshToken, REFRESH_COOKIE_OPTIONS);
 
     return res.json({
       accessToken,
@@ -147,12 +155,7 @@ export async function refreshToken(req: Request, res: Response) {
     /**
      * 🔥 SET COOKIE MỚI
      */
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("refreshToken", newRefreshToken, REFRESH_COOKIE_OPTIONS);
 
     return res.json({
       accessToken,
@@ -188,7 +191,8 @@ export async function logout(req: Request, res: Response) {
      * 🔥 XÓA COOKIE
      */
     res.clearCookie("refreshToken", {
-      path: "/api/auth/refresh",
+      ...REFRESH_COOKIE_OPTIONS,
+      maxAge: 0,
     });
 
     return res.json({ message: "Đã đăng xuất" });
