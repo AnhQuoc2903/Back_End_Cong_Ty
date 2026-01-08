@@ -20,6 +20,7 @@ interface LogParams {
   after?: any;
   ip?: string;
   userAgent?: string;
+  details?: string;
 }
 
 export async function logActivity({
@@ -33,6 +34,7 @@ export async function logActivity({
   after,
   ip,
   userAgent,
+  details,
 }: LogParams) {
   await ActivityLog.create({
     actor: actorId,
@@ -45,5 +47,6 @@ export async function logActivity({
     after,
     ip,
     userAgent,
+    details,
   });
 }

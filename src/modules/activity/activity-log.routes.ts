@@ -4,11 +4,25 @@ import { requirePermission } from "../../middleware/rbac";
 import {
   getUserActivityLogs,
   getActivityLogsByUser,
+  exportUserActivityLogs,
+  getActivityLogStats,
 } from "./activity-log.controller";
 
 const router = Router();
 
 router.use(authMiddleware);
+
+router.get(
+  "/users/export",
+  requirePermission("ADMIN_PANEL"),
+  exportUserActivityLogs
+);
+
+router.get(
+  "/users/stats",
+  requirePermission("ADMIN_PANEL"),
+  getActivityLogStats
+);
 
 // Xem tất cả log user
 router.get("/users", requirePermission("ADMIN_PANEL"), getUserActivityLogs);

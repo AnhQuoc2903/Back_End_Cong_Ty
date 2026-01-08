@@ -4,6 +4,7 @@ import { hashPassword } from "../../utils/password";
 import { AuthRequest } from "../../middleware/auth";
 import { logActivity } from "../../utils/activity-log";
 import { Types } from "mongoose";
+import { buildUpdateUserDetail } from "../../utils/activity-detail";
 
 // GET /api/users
 export async function getUsers(req: Request, res: Response) {
@@ -54,6 +55,7 @@ export async function createUser(req: AuthRequest, res: Response) {
       fullName: actor?.fullName,
     },
     action: "CREATE_USER",
+    details: `Tạo người dùng ${user.email}`,
     targetType: "User",
     targetId: user._id,
     targetSnapshot: {
@@ -89,7 +91,9 @@ export async function updateUser(req: AuthRequest, res: Response) {
   if (fullName !== undefined) update.fullName = fullName;
   if (roleIds !== undefined) update.roles = roleIds;
   if (departmentId !== undefined) update.department = departmentId;
-  if (isActive !== undefined) update.isActive = isActive;
+  if (isActive !== undefined) {
+    update.isActive = isActive === true || isActive === "true";
+  }
 
   // ===== USER TRƯỚC =====
   const beforeUser = await User.findById(req.params.id)
@@ -153,6 +157,11 @@ export async function updateUser(req: AuthRequest, res: Response) {
       .select("email fullName")
       .lean();
 
+    const details = buildUpdateUserDetail(
+      Object.keys(afterLog),
+      updatedUser.email
+    );
+
     await logActivity({
       actorId: new Types.ObjectId(req.user!.id),
       actorSnapshot: {
@@ -161,6 +170,7 @@ export async function updateUser(req: AuthRequest, res: Response) {
         fullName: actor?.fullName,
       },
       action: "UPDATE_USER",
+      details,
       targetType: "User",
       targetId: updatedUser._id,
       targetSnapshot: {
@@ -198,6 +208,7 @@ export async function deleteUser(req: AuthRequest, res: Response) {
     },
     action: "DELETE_USER",
     targetType: "User",
+    details: `Xóa người dùng ${before.email}`,
     targetId: before._id,
     targetSnapshot: {
       // 🔥 QUAN TRỌNG NHẤT

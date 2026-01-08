@@ -9,6 +9,7 @@ export interface IActivityLog extends Document {
   };
 
   action: string;
+  details?: string;
   targetType: string;
   targetId?: Types.ObjectId;
 
@@ -41,6 +42,7 @@ const activityLogSchema = new Schema<IActivityLog>(
     },
 
     action: { type: String, required: true },
+    details: { type: String },
     targetType: { type: String, required: true },
 
     targetId: {
