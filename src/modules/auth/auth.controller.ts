@@ -101,6 +101,8 @@ export async function login(req: Request, res: Response) {
       user: {
         id: user._id,
         email: user.email,
+        phone: user.phone,
+        avatar: user.avatar,
         fullName: user.fullName,
         roles: payload.roles,
         permissions: payload.permissions,
@@ -163,6 +165,8 @@ export async function refreshToken(req: Request, res: Response) {
         id: user._id,
         email: user.email,
         fullName: user.fullName,
+        phone: user.phone,
+        avatar: user.avatar,
         roles: newPayload.roles,
         permissions: newPayload.permissions,
       },
@@ -285,6 +289,57 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.json({ message: "Đặt lại mật khẩu thành công" });
   } catch (err) {
     console.error("resetPassword error:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+// ============ CHANGE PASSWORD (NO LOGOUT) ============
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Thiếu mật khẩu hiện tại hoặc mật khẩu mới" });
+    }
+
+    if (!PASSWORD_REGEX.test(newPassword)) {
+      return res.status(400).json({
+        message:
+          "Mật khẩu mới phải ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || !user.passwordHash) {
+      return res.status(404).json({ message: "User không tồn tại" });
+    }
+
+    // kiểm tra mật khẩu hiện tại
+    const isMatch = await comparePassword(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng" });
+    }
+
+    // tránh đổi sang mật khẩu giống cũ
+    const sameAsOld = await comparePassword(newPassword, user.passwordHash);
+    if (sameAsOld) {
+      return res.status(400).json({
+        message: "Mật khẩu mới không được trùng mật khẩu cũ",
+      });
+    }
+
+    // hash & save mật khẩu mới
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.json({
+      message: "Đổi mật khẩu thành công",
+    });
+  } catch (err) {
+    console.error("changePassword error:", err);
     return res.status(500).json({ message: "Lỗi server" });
   }
 };

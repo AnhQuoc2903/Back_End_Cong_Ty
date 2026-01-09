@@ -254,3 +254,75 @@ export async function searchUsers(req: Request, res: Response) {
 
   res.json({ data: items, total });
 }
+
+// PATCH /api/users/me/profile
+export async function updateMyProfile(req: AuthRequest, res: Response) {
+  const { fullName, phone, avatar } = req.body;
+
+  const update: any = {};
+  if (fullName !== undefined) update.fullName = fullName;
+  if (phone !== undefined) update.phone = phone;
+  if (avatar !== undefined) update.avatar = avatar;
+
+  const before = await User.findById(req.user!.id).lean();
+
+  if (phone && !/^\d{9,11}$/.test(phone)) {
+    return res.status(400).json({ message: "Số điện thoại không hợp lệ" });
+  }
+
+  const user = await User.findByIdAndUpdate(req.user!.id, update, {
+    new: true,
+  }).lean();
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+  const beforeLog: any = {};
+  const afterLog: any = {};
+
+  if (before?.fullName !== user.fullName) {
+    beforeLog.fullName = before?.fullName;
+    afterLog.fullName = user.fullName;
+  }
+
+  if (before?.phone !== user.phone) {
+    beforeLog.phone = before?.phone;
+    afterLog.phone = user.phone;
+  }
+
+  if (before?.avatar !== user.avatar) {
+    beforeLog.avatar = before?.avatar;
+    afterLog.avatar = user.avatar;
+  }
+
+  // 🔴 KHÔNG CÓ GÌ THAY ĐỔI → KHÔNG LOG
+  if (Object.keys(afterLog).length === 0) {
+    return res.json(user);
+  }
+
+  await logActivity({
+    actorId: user._id,
+    actorSnapshot: {
+      _id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      avatar: user.avatar,
+    },
+    action: "UPDATE_PROFILE",
+    details: "Cập nhật thông tin cá nhân",
+    targetType: "User",
+    targetId: user._id,
+    targetSnapshot: {
+      _id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      avatar: user.avatar,
+    },
+    before: beforeLog,
+    after: afterLog,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
+  res.json(user);
+}

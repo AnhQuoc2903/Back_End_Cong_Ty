@@ -5,6 +5,10 @@ export interface IUser extends Document {
   fullName?: string;
   passwordHash?: string;
 
+  phone?: string;
+  avatar?: string;
+  avatarPublicId?: string;
+
   roles: Types.ObjectId[];
   department?: Types.ObjectId;
 
@@ -18,6 +22,10 @@ const userSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     fullName: String,
     passwordHash: String,
+
+    phone: { type: String },
+    avatar: { type: String },
+    avatarPublicId: { type: String },
 
     roles: [{ type: Types.ObjectId, ref: "Role" }],
 

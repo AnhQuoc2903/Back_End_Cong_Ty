@@ -1,5 +1,7 @@
 const FIELD_LABEL: Record<string, string> = {
   fullName: "tên",
+  phone: "số điện thoại",
+  avatar: "ảnh đại diện",
   roles: "vai trò",
   department: "phòng ban",
   isActive: "trạng thái",
